@@ -16,20 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/kelseyhightower/envconfig"
 )
-
-const (
-	AppName = "s3ls"
-)
-
-type Config struct {
-	AccessKey       string `required:"true"`
-	SecretAccessKey string `required:"true"`
-	Region          string `required:"true"`
-	Bucket          string `required:"true"`
-	Workers         int
-}
 
 type Item struct {
 	Object   s3.Object
@@ -77,20 +64,23 @@ type Entry struct {
 
 func main() {
 
-	cfg := &Config{}
-	envconfig.MustProcess(AppName, cfg)
-	if cfg.Workers < 1 {
-		cfg.Workers = runtime.NumCPU()
+	if len(os.Args) < 2 {
+		fmt.Println("usage: s3ls <bucket-name>")
+		os.Exit(1)
 	}
 
+	bucketName := os.Args[1]
+	workers := runtime.NumCPU()
+
 	awsSession := session.Must(session.NewSession(&aws.Config{
-		Credentials: credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretAccessKey, ""),
-		Region:      &cfg.Region,
+		Credentials: credentials.NewChainCredentials([]credentials.Provider{
+			&credentials.EnvProvider{}, &credentials.SharedCredentialsProvider{},
+		}),
 	}))
 	s3Session := s3.New(awsSession, &aws.Config{})
 
 	ctx, killSwitch := exitContext()
-	listBucketContents(ctx, killSwitch, s3Session, cfg.Bucket, cfg.Workers)
+	listBucketContents(ctx, killSwitch, s3Session, bucketName, workers)
 
 }
 
