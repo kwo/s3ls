@@ -19,12 +19,14 @@ import (
 )
 
 type Item struct {
+	Bucket   string
 	Object   s3.Object
 	Metadata *s3.HeadObjectOutput
 }
 
 type Entry struct {
 	Key                       string            `json:"key"`
+	Bucket                    string            `json:"bucket"`
 	Invalid                   bool              `json:"invalid,omitempty"`
 	Size                      int64             `json:"size"`
 	OwnerID                   string            `json:"ownerId,omitempty"`
@@ -133,6 +135,7 @@ func fetchMetadata(ctx context.Context, killSwitch func(error), s3Session *s3.S3
 				return
 			}
 			out <- Item{
+				Bucket:   bucketName,
 				Object:   object,
 				Metadata: head,
 			}
@@ -179,6 +182,7 @@ func toEntries(items <-chan Item) <-chan Entry {
 		for item := range items {
 			entry := Entry{
 				Key:                aws.StringValue(item.Object.Key),
+				Bucket:             item.Bucket,
 				Size:               aws.Int64Value(item.Object.Size),
 				ETagObject:         aws.StringValue(item.Object.ETag),
 				LastModifiedObject: item.Object.LastModified,
