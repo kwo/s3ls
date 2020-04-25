@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -37,7 +38,7 @@ func main() {
 	cfg := &Config{}
 	envconfig.MustProcess(AppName, cfg)
 	if cfg.Workers < 1 {
-		cfg.Workers = 1
+		cfg.Workers = runtime.NumCPU()
 	}
 
 	awsSession := session.Must(session.NewSession(&aws.Config{
