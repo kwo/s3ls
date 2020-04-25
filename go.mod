@@ -1,4 +1,4 @@
-module dispatch
+module s3ls
 
 go 1.14
 

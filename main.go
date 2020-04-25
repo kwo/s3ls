@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AppName = "dispatch"
+	AppName = "s3ls"
 )
 
 type Config struct {

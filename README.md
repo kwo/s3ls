@@ -9,11 +9,11 @@ so it is helpful to have a pool of workers for this task.
 ## Usage
 
 ```shell script
-export DISPATCH_ACCESSKEY=<access-key>
-export DISPATCH_SECRETACCESSKEY=<secret-access-key>
-export DISPATCH_REGION=<region>
-export DISPATCH_BUCKET=<bucket-name>
-export DISPATCH_WORKERS=3
+export S3LS_ACCESSKEY=<access-key>
+export S3LS_SECRETACCESSKEY=<secret-access-key>
+export S3LS_REGION=<region>
+export S3LS_BUCKET=<bucket-name>
+export S3LS_WORKERS=3
 
 go run .
 ```
