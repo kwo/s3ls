@@ -27,3 +27,11 @@ or set `AWS_SDK_LOAD_CONFIG=true` to use the region in the aws profile.
 ```shell script
 go run . <bucket-name>
 ```
+
+## Build
+
+```shell script
+go build -ldflags="-s -w" .
+upx --brute s3ls
+mv s3ls $GOBIN
+```
