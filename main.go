@@ -25,9 +25,9 @@ type Item struct {
 }
 
 type Entry struct {
+	Invalid                   bool              `json:"invalid,omitempty"` // true if head data cannot be retrieved
 	Key                       string            `json:"key"`
 	Bucket                    string            `json:"bucket"`
-	Invalid                   bool              `json:"invalid,omitempty"`
 	Size                      int64             `json:"size"`
 	OwnerID                   string            `json:"ownerId,omitempty"`
 	OwnerName                 string            `json:"ownerName,omitempty"`
@@ -96,8 +96,8 @@ func listBucketContents(ctx context.Context, killSwitch func(error), s3Session *
 	}
 	items := merge(workers...)
 
-	entries := toEntries(items)
-	printEntriesAsJson(os.Stdout, entries)
+	entries := toEntries(ctx, killSwitch, items)
+	entriesToJson(ctx, killSwitch, entries, os.Stdout)
 
 }
 
@@ -106,17 +106,23 @@ func listObjects(ctx context.Context, killSwitch func(error), s3Session *s3.S3, 
 	out := make(chan s3.Object)
 
 	go func() {
+		defer close(out)
 		listing, err := s3Session.ListObjectsV2WithContext(ctx, &s3.ListObjectsV2Input{Bucket: &bucketName})
 		if err != nil {
 			killSwitch(fmt.Errorf("cannot list objects: %w", err))
+			return
 		} else {
 			for _, object := range listing.Contents {
-				if object != nil {
-					out <- *object
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					if object != nil {
+						out <- *object
+					}
 				}
 			}
 		}
-		close(out)
 	}()
 
 	return out
@@ -128,19 +134,24 @@ func fetchMetadata(ctx context.Context, killSwitch func(error), s3Session *s3.S3
 	out := make(chan Item)
 
 	go func() {
+		defer close(out)
 		for object := range in {
-			head, err := s3Session.HeadObjectWithContext(ctx, &s3.HeadObjectInput{Bucket: &bucketName, Key: object.Key})
-			if err != nil {
-				killSwitch(err)
+			select {
+			case <-ctx.Done():
 				return
-			}
-			out <- Item{
-				Bucket:   bucketName,
-				Object:   object,
-				Metadata: head,
-			}
-		}
-		close(out)
+			default:
+				head, err := s3Session.HeadObjectWithContext(ctx, &s3.HeadObjectInput{Bucket: &bucketName, Key: object.Key})
+				if err != nil {
+					killSwitch(err)
+					return
+				}
+				out <- Item{
+					Bucket:   bucketName,
+					Object:   object,
+					Metadata: head,
+				}
+			} // select
+		} // loop
 	}()
 
 	return out
@@ -153,6 +164,10 @@ func merge(workers ...<-chan Item) <-chan Item {
 
 	var wg sync.WaitGroup
 	wg.Add(len(workers))
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
 
 	copier := func(items <-chan Item) {
 		for item := range items {
@@ -165,20 +180,16 @@ func merge(workers ...<-chan Item) <-chan Item {
 		go copier(worker)
 	}
 
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
 	return out
 
 }
 
-func toEntries(items <-chan Item) <-chan Entry {
+func toEntries(ctx context.Context, killSwitch func(error), items <-chan Item) <-chan Entry {
 
 	out := make(chan Entry)
 
 	go func() {
+		defer close(out)
 		for item := range items {
 			entry := Entry{
 				Key:                aws.StringValue(item.Object.Key),
@@ -223,27 +234,52 @@ func toEntries(items <-chan Item) <-chan Entry {
 				entry.VersionId = aws.StringValue(item.Metadata.VersionId)
 				entry.WebsiteRedirectLocation = aws.StringValue(item.Metadata.WebsiteRedirectLocation)
 			}
-			out <- entry
+
+			select {
+			case out <- entry:
+			case <-ctx.Done():
+				return
+			}
 		}
-		close(out)
 	}()
 
 	return out
 
 }
 
-func printEntriesAsJson(w io.Writer, entries <-chan Entry) {
-	notRowOne := false
-	_, _ = w.Write([]byte("["))
-	for entry := range entries {
-		if notRowOne {
-			_, _ = w.Write([]byte(","))
-		}
-		data, _ := json.Marshal(entry)
-		_, _ = w.Write(data)
-		notRowOne = true
+func entriesToJson(ctx context.Context, killSwitch func(error), entries <-chan Entry, w io.Writer) {
+	addLeadingComma := false
+	if _, err := w.Write([]byte("[")); err != nil {
+		killSwitch(err)
+		return
 	}
-	_, _ = w.Write([]byte("]"))
+	for entry := range entries {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if addLeadingComma {
+				if _, err := w.Write([]byte(",\n")); err != nil {
+					killSwitch(err)
+					return
+				}
+			}
+			data, err := json.Marshal(entry)
+			if err != nil {
+				killSwitch(err)
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				killSwitch(err)
+				return
+			}
+			addLeadingComma = true
+		}
+	}
+	if _, err := w.Write([]byte("]")); err != nil {
+		killSwitch(err)
+		return
+	}
 }
 
 func exitContext() (context.Context, func(error)) {
