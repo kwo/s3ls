@@ -18,12 +18,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+// Item represents an S3 Item
 type Item struct {
 	Bucket   string
 	Object   s3.Object
 	Metadata *s3.HeadObjectOutput
 }
 
+// Entry represents all of the properties an individual S3 Object
 type Entry struct {
 	Invalid                   bool              `json:"invalid,omitempty"` // true if head data cannot be retrieved
 	Key                       string            `json:"key"`
@@ -57,10 +59,10 @@ type Entry struct {
 	Restore                   string            `json:"restore,omitempty"`
 	SSECustomerAlgorithm      string            `json:"sseCustomerAlgorithm,omitempty"`
 	SSECustomerKeyMD5         string            `json:"sseCustomerKeyMD5,omitempty"`
-	SSEKMSKeyId               string            `json:"sseKMSKeyId,omitempty"`
+	SSEKMSKeyID               string            `json:"sseKMSKeyId,omitempty"`
 	ServerSideEncryption      string            `json:"serverSideEncryption,omitempty"`
 	StorageClass              string            `json:"storageClass,omitempty"`
-	VersionId                 string            `json:"versionId,omitempty"`
+	VersionID                 string            `json:"versionId,omitempty"`
 	WebsiteRedirectLocation   string            `json:"websiteRedirectLocation,omitempty"`
 }
 
@@ -96,8 +98,8 @@ func listBucketContents(ctx context.Context, killSwitch func(error), s3Session *
 	}
 	items := merge(workers...)
 
-	entries := toEntries(ctx, killSwitch, items)
-	entriesToJson(ctx, killSwitch, entries, os.Stdout)
+	entries := toEntries(ctx, items)
+	entriesToJSON(ctx, killSwitch, entries, os.Stdout)
 
 }
 
@@ -111,15 +113,14 @@ func listObjects(ctx context.Context, killSwitch func(error), s3Session *s3.S3, 
 		if err != nil {
 			killSwitch(fmt.Errorf("cannot list objects: %w", err))
 			return
-		} else {
-			for _, object := range listing.Contents {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					if object != nil {
-						out <- *object
-					}
+		}
+		for _, object := range listing.Contents {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if object != nil {
+					out <- *object
 				}
 			}
 		}
@@ -184,7 +185,7 @@ func merge(workers ...<-chan Item) <-chan Item {
 
 }
 
-func toEntries(ctx context.Context, killSwitch func(error), items <-chan Item) <-chan Entry {
+func toEntries(ctx context.Context, items <-chan Item) <-chan Entry {
 
 	out := make(chan Entry)
 
@@ -228,10 +229,10 @@ func toEntries(ctx context.Context, killSwitch func(error), items <-chan Item) <
 				entry.Restore = aws.StringValue(item.Metadata.Restore)
 				entry.SSECustomerAlgorithm = aws.StringValue(item.Metadata.SSECustomerAlgorithm)
 				entry.SSECustomerKeyMD5 = aws.StringValue(item.Metadata.SSECustomerKeyMD5)
-				entry.SSEKMSKeyId = aws.StringValue(item.Metadata.SSEKMSKeyId)
+				entry.SSEKMSKeyID = aws.StringValue(item.Metadata.SSEKMSKeyId)
 				entry.ServerSideEncryption = aws.StringValue(item.Metadata.ServerSideEncryption)
 				entry.StorageClass = aws.StringValue(item.Metadata.StorageClass)
-				entry.VersionId = aws.StringValue(item.Metadata.VersionId)
+				entry.VersionID = aws.StringValue(item.Metadata.VersionId)
 				entry.WebsiteRedirectLocation = aws.StringValue(item.Metadata.WebsiteRedirectLocation)
 			}
 
@@ -247,7 +248,7 @@ func toEntries(ctx context.Context, killSwitch func(error), items <-chan Item) <
 
 }
 
-func entriesToJson(ctx context.Context, killSwitch func(error), entries <-chan Entry, w io.Writer) {
+func entriesToJSON(ctx context.Context, killSwitch func(error), entries <-chan Entry, w io.Writer) {
 	addLeadingComma := false
 	if _, err := w.Write([]byte("[")); err != nil {
 		killSwitch(err)
@@ -296,12 +297,9 @@ func exitContext() (context.Context, func(error)) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		select {
-		case <-c:
-			cancel()
-			fmt.Println()
-			return
-		}
+		<-c
+		cancel()
+		fmt.Println()
 	}()
 
 	return ctx, killSwitch
