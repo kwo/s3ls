@@ -18,42 +18,32 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-// Item represents an S3 Item
+// Item represents an S3 Item.
 type Item struct {
 	Bucket   string
 	Object   s3.Object
 	Metadata *s3.HeadObjectOutput
 }
 
-// Entry represents all of the properties an individual S3 Object
+// Entry represents all of the properties an individual S3 Object.
 type Entry struct {
-	Invalid                   bool              `json:"invalid,omitempty"` // true if head data cannot be retrieved
 	Key                       string            `json:"key"`
 	Bucket                    string            `json:"bucket"`
-	Size                      int64             `json:"size"`
 	OwnerID                   string            `json:"ownerId,omitempty"`
 	OwnerName                 string            `json:"ownerName,omitempty"`
 	ETagObject                string            `json:"etagObject,omitempty"`
-	LastModifiedObject        *time.Time        `json:"lastModifiedObject,omitempty"`
 	StorageClassObject        string            `json:"storageClassObject,omitempty"`
 	AcceptRanges              string            `json:"acceptRanges,omitempty"`
 	CacheControl              string            `json:"cacheControl,omitempty"`
 	ContentDisposition        string            `json:"contentDisposition,omitempty"`
 	ContentEncoding           string            `json:"contentEncoding,omitempty"`
 	ContentLanguage           string            `json:"contentLanguage,omitempty"`
-	ContentLength             int64             `json:"contentLength,omitempty"`
 	ContentType               string            `json:"contentType,omitempty"`
-	DeleteMarker              bool              `json:"deleteMarker,omitempty"`
 	ETag                      string            `json:"etag,omitempty"`
 	Expiration                string            `json:"expiration,omitempty"`
 	Expires                   string            `json:"expires,omitempty"`
-	LastModified              *time.Time        `json:"lastModified,omitempty"`
-	Metadata                  map[string]string `json:"metadata,omitempty"`
-	MissingMeta               int64             `json:"missingMeta,omitempty"`
 	ObjectLockLegalHoldStatus string            `json:"objectLockLegalHoldStatus,omitempty"`
 	ObjectLockMode            string            `json:"objectLockMode,omitempty"`
-	ObjectLockRetainUntilDate *time.Time        `json:"objectLockRetainUntilDate,omitempty"`
-	PartsCount                int64             `json:"partsCount,omitempty"`
 	ReplicationStatus         string            `json:"replicationStatus,omitempty"`
 	RequestCharged            string            `json:"requestCharged,omitempty"`
 	Restore                   string            `json:"restore,omitempty"`
@@ -64,11 +54,21 @@ type Entry struct {
 	StorageClass              string            `json:"storageClass,omitempty"`
 	VersionID                 string            `json:"versionId,omitempty"`
 	WebsiteRedirectLocation   string            `json:"websiteRedirectLocation,omitempty"`
+	Size                      int64             `json:"size"`
+	LastModifiedObject        *time.Time        `json:"lastModifiedObject,omitempty"`
+	ContentLength             int64             `json:"contentLength,omitempty"`
+	LastModified              *time.Time        `json:"lastModified,omitempty"`
+	Metadata                  map[string]string `json:"metadata,omitempty"`
+	MissingMeta               int64             `json:"missingMeta,omitempty"`
+	ObjectLockRetainUntilDate *time.Time        `json:"objectLockRetainUntilDate,omitempty"`
+	PartsCount                int64             `json:"partsCount,omitempty"`
+	DeleteMarker              bool              `json:"deleteMarker,omitempty"`
+	Invalid                   bool              `json:"invalid,omitempty"` // true if head data cannot be retrieved
 }
 
 func main() {
-
-	if len(os.Args) < 2 {
+	const zeroArguments = 1
+	if len(os.Args) <= zeroArguments {
 		fmt.Println("usage: s3ls <bucket-name>")
 		os.Exit(1)
 	}
@@ -85,11 +85,10 @@ func main() {
 
 	ctx, killSwitch := exitContext()
 	listBucketContents(ctx, killSwitch, s3Session, bucketName, workers)
-
 }
 
-func listBucketContents(ctx context.Context, killSwitch func(error), s3Session *s3.S3, bucketName string, workerCount int) {
-
+func listBucketContents(
+	ctx context.Context, killSwitch func(error), s3Session *s3.S3, bucketName string, workerCount int) {
 	objects := listObjects(ctx, killSwitch, s3Session, bucketName)
 
 	workers := make([]<-chan Item, workerCount)
@@ -100,11 +99,9 @@ func listBucketContents(ctx context.Context, killSwitch func(error), s3Session *
 
 	entries := toEntries(ctx, items)
 	entriesToJSON(ctx, killSwitch, entries, os.Stdout)
-
 }
 
 func listObjects(ctx context.Context, killSwitch func(error), s3Session *s3.S3, bucketName string) <-chan s3.Object {
-
 	out := make(chan s3.Object)
 
 	go func() {
@@ -127,11 +124,10 @@ func listObjects(ctx context.Context, killSwitch func(error), s3Session *s3.S3, 
 	}()
 
 	return out
-
 }
 
-func fetchMetadata(ctx context.Context, killSwitch func(error), s3Session *s3.S3, bucketName string, in <-chan s3.Object) <-chan Item {
-
+func fetchMetadata(
+	ctx context.Context, killSwitch func(error), s3Session *s3.S3, bucketName string, in <-chan s3.Object) <-chan Item {
 	out := make(chan Item)
 
 	go func() {
@@ -141,7 +137,8 @@ func fetchMetadata(ctx context.Context, killSwitch func(error), s3Session *s3.S3
 			case <-ctx.Done():
 				return
 			default:
-				head, err := s3Session.HeadObjectWithContext(ctx, &s3.HeadObjectInput{Bucket: &bucketName, Key: object.Key})
+				head, err := s3Session.HeadObjectWithContext(
+					ctx, &s3.HeadObjectInput{Bucket: &bucketName, Key: object.Key})
 				if err != nil {
 					killSwitch(err)
 					return
@@ -156,11 +153,9 @@ func fetchMetadata(ctx context.Context, killSwitch func(error), s3Session *s3.S3
 	}()
 
 	return out
-
 }
 
 func merge(workers ...<-chan Item) <-chan Item {
-
 	out := make(chan Item)
 
 	var wg sync.WaitGroup
@@ -182,11 +177,9 @@ func merge(workers ...<-chan Item) <-chan Item {
 	}
 
 	return out
-
 }
 
-func toEntries(ctx context.Context, items <-chan Item) <-chan Entry {
-
+func toEntries(ctx context.Context, items <-chan Item) <-chan Entry { //nolint:funlen
 	out := make(chan Entry)
 
 	go func() {
@@ -245,7 +238,6 @@ func toEntries(ctx context.Context, items <-chan Item) <-chan Entry {
 	}()
 
 	return out
-
 }
 
 func entriesToJSON(ctx context.Context, killSwitch func(error), entries <-chan Entry, w io.Writer) {
@@ -284,7 +276,6 @@ func entriesToJSON(ctx context.Context, killSwitch func(error), entries <-chan E
 }
 
 func exitContext() (context.Context, func(error)) {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	killSwitch := func(err error) {
 		cancel()
@@ -303,5 +294,4 @@ func exitContext() (context.Context, func(error)) {
 	}()
 
 	return ctx, killSwitch
-
 }

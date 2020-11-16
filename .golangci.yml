@@ -1,0 +1,14 @@
+linters:
+  enable-all: true
+  disable:
+    - exhaustivestruct
+    - nlreturn
+    - godox
+    - wsl
+    - whitespace
+linters-settings:
+  gci:
+    local-prefixes: s3ls
+  lll:
+    line-length: 120
+    tab-width: 4
