@@ -31,7 +31,7 @@ go run . <bucket-name>
 ## Build
 
 ```shell script
-go build -ldflags="-s -w" github.com/kwo/s3ls/cmd/s3ls
+go build -ldflags="-s -w" .
 upx --brute s3ls
 mv s3ls $GOBIN
 ```
