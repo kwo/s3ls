@@ -1,14 +1,43 @@
 linters:
-  enable-all: true
-  disable:
-    - exhaustivestruct
-    - nlreturn
-    - godox
-    - wsl
-    - whitespace
+  disable-all: true
+  enable:
+    - bodyclose
+    - dogsled
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errorlint
+    - errname
+    - exhaustive
+    - exportloopref
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
+    - gofumpt
+    - gosec
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - makezero
+    - maintidx
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unused
 linters-settings:
   gci:
-    local-prefixes: s3ls
-  lll:
-    line-length: 120
-    tab-width: 4
+    sections:
+      - standard
+      - default
+      - prefix(github.com/kwo/s3ls)
+  maintidx:
+    # Show functions with maintainability index lower than N.
+    # A high index indicates better maintainability (it's kind of the opposite of complexity).
+    # Default: 20
+    under: 40
+
